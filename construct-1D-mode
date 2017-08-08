@@ -1,0 +1,122 @@
+#!/bin/bash
+
+    default_output_file="modes/constructed_mode_101"
+default_coordinate_file="coords"
+
+function MAN {
+    cat << EOF
+Synopsis: ${0##*/} {h} 
+            First  line number
+            Second line number
+            [Output file]
+            [Coordinate file]
+
+Description:
+    Generates one dimensional constructed modes for vibrations.
+    The input takes the line numbers of two atom coordinates in
+    a coordinate file.
+
+    The default values are:
+        Output file:        $default_output_file
+        Coordinate file:    $default_coordinate_file
+
+EOF
+}
+export -f MAN
+
+for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+if [[ $# > 4 ]]; then MAN; exit 1; fi
+
+#---------------------------------------------------------------------
+#                       Actual start of script
+#---------------------------------------------------------------------
+    linenumber1="$1"
+    linenumber2="$2"
+    output_file="${3:-$default_output_file}"
+coordinate_file="${4:-$default_coordinate_file}"
+
+if [ $linenumber1 -eq $linenumber2 ]; then
+    printf "Please specify two different line numbers, aborting...\n\n"
+    MAN;
+    exit 2
+fi
+
+if [ -e $output_file ]; then
+    printf "Outputfile \"$output_file\" already exists, do you want to delete it? [y/n]\n" 1>&2
+    
+    read answer
+    if [[ $answer != 'y' ]]; then
+        printf "Outputfile \"$output_file\" will be preserved\n" 1>&2
+        printf "Redirecting output to stdout...\n\n" 1>&2
+        output_file=/dev/stdout
+    fi
+fi
+
+awk '
+    function getmass(value){
+             if (value == "H") { return  1.0078250; }
+        else if (value == "C") { return 12.0000000; }
+        else if (value == "O") { return 15.9949146; }
+        else { return -1; }
+    }
+    {
+        if(NR == '$linenumber1'){
+            type1 = $1;
+            mass1 = getmass(type1);
+              x1  = $2;
+              y1  = $3;
+              z1  = $4;
+        }
+
+        if(NR == '$linenumber2'){
+            type2 = $1;
+            mass2 = getmass(type2);
+              x2  = $2;
+              y2  = $3;
+              z2  = $4;
+        }
+    }END{
+
+        if(mass1 == -1 || mass2 == -1){
+            printf "A problem occurred with the mass determination\n";
+            printf "Please check if the mass of the given Atoms is\n";
+            printf "present in the getmass() function. Aborting...\n\n";
+            exit -1;
+        }
+
+        dx  = x2 - x1;
+        dy  = y2 - y1;
+        dz  = z2 - z1;
+
+        nx1 =  dx * mass2/(mass2+mass1);
+        ny1 =  dy * mass2/(mass2+mass1);
+        nz1 =  dz * mass2/(mass2+mass1);
+
+        nx2 = -dx * mass1/(mass2+mass1);
+        ny2 = -dy * mass1/(mass2+mass1);
+        nz2 = -dz * mass1/(mass2+mass1);
+
+        norm = sqrt(nx1*nx1 + ny1*ny1 + nz1*nz1 + nx2*nx2 + ny2*ny2 + nz2*nz2);
+
+        nx1 /= norm;
+        ny1 /= norm;
+        nz1 /= norm;
+        nx2 /= norm;
+        ny2 /= norm;
+        nz2 /= norm;
+
+        mass = (nx1*nx1 + ny1*ny1 + nz1*nz1)*mass1 + (nx2*nx2 + ny2*ny2 + nz2*nz2)*mass2;
+        norm = sqrt(nx1*nx1 + ny1*ny1 + nz1*nz1 + nx2*nx2 + ny2*ny2 + nz2*nz2);
+
+        for(i = 1; i <= NR; ++i){
+            if(i == '$linenumber1'){
+                printf("%20.14lf  %20.14lf  %20.14lf  %20.14lf\n", nx1, ny1, nz1, mass1);
+            }
+            else if(i == '$linenumber2'){
+                printf("%20.14lf  %20.14lf  %20.14lf  %20.14lf\n", nx2, ny2, nz2, mass2);
+            }
+            else{
+                printf("%20.14lf  %20.14lf  %20.14lf  %20.14lf\n", 0, 0, 0, 0);
+            }
+        }
+    }' $coordinate_file > $output_file
