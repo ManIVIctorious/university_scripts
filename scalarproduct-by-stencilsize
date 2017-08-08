@@ -83,10 +83,10 @@ if [ $output_file != $default_output_file ]; then
 fi
 
 for sx in $(seq 3 2 13); do
-    Hess=$(2D_differenciation -i $potential -x $sx | grep -P "^\s*[- ]0\.0{14}\s*[- ]0\.0{14}\s*[- ]" | awk '{printf "[%.14lf,%.14lf;%.14lf,%.14lf]\n", $(NF-2), $NF, $NF, $(NF-1)}')
+    Hess=$(2d_differenciation -i $potential -x $sx | grep -P "^\s*[- ]0\.0{14}\s*[- ]0\.0{14}\s*[- ]" | awk '{printf "[%.14lf,%.14lf;%.14lf,%.14lf]\n", $(NF-2), $NF, $NF, $(NF-1)}')
     
     printf "\n2D diff stencil size = ${sx}x${sx}\n" >> $output_file
-    octave --no-gui << EOF >> $output_file
+    octave --silent --no-gui << EOF >> $output_file
         format long;
         
     # input
