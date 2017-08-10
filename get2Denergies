@@ -21,6 +21,9 @@ Synopsis:  ${0##*/} {-h}
                     {-o Output file}
                     [list of input directories]
 
+Requires:
+    GNU/Parallel
+
 Description:
     Takes a 2D mode scan directory and extracts the
         - q1 coordinates

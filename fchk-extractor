@@ -18,7 +18,7 @@ Description:
         - harmonic frequencies   > outputdirectory/freq_harmonic
     and output a paste of minimum coordinates and masses for a quick check
 
-    The defualt values are:
+    The default values are:
         Output Directory = $defaultoutputdir
 
 EOF
