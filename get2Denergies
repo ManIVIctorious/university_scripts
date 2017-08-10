@@ -1,0 +1,127 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------------------
+#                               Default parameters 
+#--------------------------------------------------------------------------------
+     ModePattern='modes_\d{2,}_'
+   DataDirectory="2D_mode_scans"
+default_inputdir=$(ls -d ${DataDirectory}/* 2>/dev/null | grep -P "$ModePattern" )
+ OutputDirectory="${DataDirectory}/numerov2d"
+  OutputFileName="energies.dat"
+
+
+#--------------------------------------------------------------------------------
+#                                Print help page
+#--------------------------------------------------------------------------------
+function MAN {
+cat << EOF 1>&2
+
+Synopsis:  ${0##*/} {-h}
+                    {-d Output directory}
+                    {-o Output file}
+                    [list of input directories]
+
+Description:
+    Takes a 2D mode scan directory and extracts the
+        - q1 coordinates
+        - q2 coordinates
+        - SCF energies
+        - x-/y-/z- dipole moments
+    to an output file and verifies that all entries are populated
+
+    The default values are:
+        Output Directory  = $OutputDirectory
+        Output File Name  = outputdirectory/<Mode>_${OutputFileName}
+        Input Directories = '+${DataDirectory}/${ModePattern}+!d'
+
+EOF
+}
+export -f MAN
+for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+
+
+#--------------------------------------------------------------------------------
+#               Populate variables and provide input error handling
+#--------------------------------------------------------------------------------
+while getopts "hHd:o:" opt; do
+    case $opt in
+        d)   OutputDirectory="$OPTARG";;
+        o)    OutputFileName="$OPTARG";;
+        h|H)  MAN; exit 0;;
+    esac
+done
+shift $(( OPTIND - 1 ))
+
+InputDirectory=${@:-$default_inputdir}
+
+if [ -z $OutputDirectory ]; then
+    printf "\nError: No Outputdirectory given.\n" 1>&2
+    exit 1
+fi
+
+for iteration in $InputDirectory; do
+    if [[ ! -d $iteration || -z $iteration ]]; then
+        printf "\nError: The provided input directory is not valid.\n" 1>&2
+        printf "$InputDirectory" 1>&2
+        printf "\n" 1>&2
+        MAN
+        exit 1
+    fi
+done
+
+export InputDirectory
+export OutputDirectory
+export OutputFileName
+
+
+#--------------------------------------------------------------------------------
+#                             Actual start of Script
+#--------------------------------------------------------------------------------
+function ExtractData {
+          ModeDir="$1"
+    if [ -z ModeDir ]; then echo "Input error" 1>&2; exit 1; fi
+             Mode=${ModeDir##*/}
+       EnergyFile="${OutputDirectory}/${Mode}_${OutputFileName}"
+    TemporaryFile="${OutputDirectory}/tmp_${Mode}"
+
+    if [ ! -d "$OutputDirectory" ]; then mkdir -p "$OutputDirectory"; fi
+    if [   -e "$EnergyFile"      ]; then echo "File \"$EnergyFile\" already exists!" 1>&2 ; exit; fi
+    if [   -e "$TemporaryFile"   ]; then rm "${TemporaryFile}"; fi
+
+    for i in ${ModeDir}/*.log; do
+            dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i)
+          e_hf=$(grep "SCF Done" $i | awk '{printf "%+.14lf\n", $5}')
+        dipole=$(grep -A1 "Dipole moment" $i | tail -n1 | awk '{printf "%+.14lf    %+.14lf    %+.14lf\n", $2, $4, $6}')
+
+        if [ -z $e_hf ]; then echo "$i not terminated" 1>&2 ; continue; fi
+        echo -e " $dq\t$e_hf\t$dipole" >> "${TemporaryFile}"
+    done
+
+    if [ -s ${TemporaryFile} ]; then
+    # check if the grid is fully populated:
+    #   print and sort first and second column, get number of unique occurrences,
+    #   if all values of dq1 occure dq2 times and vice versa the number of occurences is returned, else return -1
+        nq1="$(awk '{print $2}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+        nq2="$(awk '{print $1}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+    
+        if [ $nq1 -eq -1 -o $nq2 -eq -1 ]; then
+            echo "Error: Inconsistent number of coordinates" 1>&2
+            exit 1
+        fi
+    
+    # check if every column has 6 entries (q1 q2 E mu_x mu_y mu_z)
+        control=$(awk 'BEGIN{ control = 0 }{ if(NF != 6){ control = -1; exit } }END{ print control }' ${TemporaryFile})
+        if [ $control -ne 0 ]; then
+            echo "Error: Column count not equal in all lines" 1>&2
+            exit 2
+        fi
+    
+        echo -e "N\t$nq1\t$nq2" > ${EnergyFile}
+        echo -e "#  delta x     delta y     Energy in hartree    dipolemoment(x,y,z) in debye" >> ${EnergyFile}
+        sort -g -k1 -k2 "${TemporaryFile}" | awk '{print $0}{if(NR%'$nq2' == 0){printf "\n"}}' >> ${EnergyFile}
+    fi
+    if [ -e "${TemporaryFile}" ]; then rm "${TemporaryFile}"; fi
+}
+export -f ExtractData
+
+parallel -j 4 ExtractData ::: $InputDirectory
