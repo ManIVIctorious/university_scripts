@@ -142,9 +142,11 @@ if [ -z $Hess ]; then
 fi
 
 # output Hessian to stderr
-sed "s/\[/\nHessian:\n\t/; s/,/\t/g; s/;/\n\t/; s/\]/\n/" <<< "$Hess" 1>&2
+sed "s/\(\[\|,\|;\)\([0-9]\)/\1 \2/g; s/\[/\nHessian:\n\t/; s/,/\t/g; s/;/\n\t/; s/\t[0-9]/ &/g; s/\]/\n/" <<< $Hess 1>&2
 
 octave --silent --no-gui << EOF
+format long
+
 # input
     c_mode_1 = load("$mode_A");
     c_mode_2 = load("$mode_B");
@@ -152,6 +154,25 @@ octave --silent --no-gui << EOF
     
 # diagonalisation
     [evec, eval] = eig($Hess);
+
+# output (only for informational purpose)
+    fprintf(stderr, "%s\n", "Eigenvectors:")
+    for i = 1:rows(evec)
+        for j = 1:columns(evec)
+            fprintf(stderr, "\t% .14f", evec(i,j))
+        endfor
+        fprintf(stderr, "\n")
+    endfor
+    fprintf(stderr, "\n")
+
+    fprintf(stderr, "%s\n", "Eigenvalues:")
+    for i = 1:rows(eval)
+        for j = 1:columns(eval)
+            fprintf(stderr, "\t% .14f", eval(i,j))
+        endfor
+        fprintf(stderr, "\n")
+    endfor
+    fprintf(stderr, "\n")
     
 # construct combined modes
     cc_mode_1 = c_mode_1(:,1:3) * evec(1,1) + c_mode_2(:,1:3) * evec(2,1);

@@ -3,11 +3,12 @@
 #--------------------------------------------------------------------------------
 #                               Default parameters 
 #--------------------------------------------------------------------------------
-     ModePattern='modes_\d{2,}_'
+     ModePattern='modes_\d{2,}'
    DataDirectory="2D_mode_scans"
 default_inputdir=$(ls -d ${DataDirectory}/* 2>/dev/null | grep -P "$ModePattern" )
  OutputDirectory="${DataDirectory}/numerov2d"
   OutputFileName="energies.dat"
+           force=0
 
 
 #--------------------------------------------------------------------------------
@@ -19,6 +20,7 @@ cat << EOF 1>&2
 Synopsis:  ${0##*/} {-h}
                     {-d Output directory}
                     {-o Output file}
+                    {-f force}
                     [list of input directories]
 
 Requires:
@@ -46,10 +48,11 @@ for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
 #--------------------------------------------------------------------------------
 #               Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "hHd:o:" opt; do
+while getopts "fhHd:o:" opt; do
     case $opt in
         d)   OutputDirectory="$OPTARG";;
         o)    OutputFileName="$OPTARG";;
+        f)             force=1;;
         h|H)  MAN; exit 0;;
     esac
 done
@@ -75,6 +78,7 @@ done
 export InputDirectory
 export OutputDirectory
 export OutputFileName
+export force
 
 
 #--------------------------------------------------------------------------------
@@ -88,8 +92,17 @@ function ExtractData {
     TemporaryFile="${OutputDirectory}/tmp_${Mode}"
 
     if [ ! -d "$OutputDirectory" ]; then mkdir -p "$OutputDirectory"; fi
-    if [   -e "$EnergyFile"      ]; then echo "File \"$EnergyFile\" already exists!" 1>&2 ; exit; fi
     if [   -e "$TemporaryFile"   ]; then rm "${TemporaryFile}"; fi
+
+    if [ -r "$EnergyFile" ]; then
+        echo "File \"$EnergyFile\" already exists!" 1>&2
+        if [ $force -eq 1 ]; then
+            echo "Force enabled, continuing anyway" 1>&2
+        else
+            echo "Aborting..." 1>&2
+            exit
+        fi
+    fi
 
     for i in ${ModeDir}/*.log; do
             dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i)
