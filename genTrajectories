@@ -1,0 +1,127 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------------------
+#                               Default parameters 
+#--------------------------------------------------------------------------------
+NumberOfAtoms="$(awk 'END{print NR}' coords)"
+        force=0
+
+  ModePattern='modes_\d{2,}'
+DataDirectory="2D_mode_scans"
+  default_dir=$(ls -d ${DataDirectory}/* 2>/dev/null | grep -P "$ModePattern" )
+
+#--------------------------------------------------------------------------------
+#                              Function definition
+#--------------------------------------------------------------------------------
+function MAN {
+cat << EOF 1>&2
+
+Synopsis:  ${0##*/} {-h}
+                    {-f   force}
+                    {-F noforce}
+                    [list of input directories]
+
+Description:
+    Takes a list of 2D mode scan directories and extracts the
+    full coordinates, as well as the coordinates alongside the 
+    individual modes to three xyz-files.
+
+    The default values are:
+        Input Directories = '+${DataDirectory}/${ModePattern}+!d'
+
+EOF
+}
+export -f MAN
+for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+
+function overwrite {
+    file=$1
+    
+# if force = 0: ask
+# if force = 1: overwrite anyway
+#         else: do not overwrite
+    if [ $force -eq 0 ]; then
+
+        printf "\tThe file \"$file\" already exists, do you want to overwrite it? [y/n]\n" 1>&2
+
+        read answer
+        if [ ! -z $answer ]; then
+            if [ $answer = 'y' ]; then
+                rm $file
+            fi
+        fi
+
+    elif [ $force -eq 1 ]; then
+        printf "\tThe file \"$file\" already exists, do you want to overwrite it? [y/n]\n" 1>&2
+        printf "\t\tForce enabled, continuing anyway\n" 1>&2
+        rm $file
+    fi
+}
+export -f overwrite
+
+
+#--------------------------------------------------------------------------------
+#               Populate variables and provide input error handling
+#--------------------------------------------------------------------------------
+while getopts "fFhHn:" opt; do
+    case $opt in
+        n)     NumberOfAtoms="$OPTARG";;
+        f)             force=1;;
+        F)             force=2;;
+        h|H)  MAN; exit 0;;
+    esac
+done
+shift $(( OPTIND - 1 ))
+
+export force
+
+InputDirectory=${@:-$default_dir}
+if [ -z $NumberOfAtoms ]; then echo "Please enter a valid number of atoms" 1>&2; exit 0; fi
+
+
+#--------------------------------------------------------------------------------
+#                             Actual start of Script
+#--------------------------------------------------------------------------------
+for Directory in $InputDirectory; do
+
+    if [ ! -d $Directory ]; then 
+        printf "Directory \"$Directory\" does not exist.\n" 1>&2
+        printf "Please specify a (list of) valid input directories!\n" 1>&2
+        printf "Skipping...\n" 1>&2
+        continue
+    fi
+    cd $Directory
+    printf "$Directory\n" 1>&2
+
+# Full trajectory
+    file=trajectory.xyz
+    if [ -f $file ]; then overwrite $file; fi
+    if [ ! -f $file ]; then
+        for i in *.com; do
+            printf "$NumberOfAtoms\n\n"
+            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
+        done > $file
+    fi
+    
+# Trajectory of mode A
+    file=traj_01.xyz
+    if [ -f $file ]; then overwrite $file; fi
+    if [ ! -f $file ]; then
+        for i in *dr=*_+0.00000000000000.com; do
+            printf "$NumberOfAtoms\n\n"
+            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
+        done > $file
+    fi
+    
+# Trajectory of mode B
+    file=traj_02.xyz
+    if [ -f $file ]; then overwrite $file; fi
+    if [ ! -f $file ]; then
+        for i in *dr=+0.00000000000000_*.com; do
+            printf "$NumberOfAtoms\n\n"
+            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
+        done > $file
+    fi
+
+    cd - 1>/dev/null 2>&1
+done
