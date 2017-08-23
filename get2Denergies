@@ -20,7 +20,8 @@ cat << EOF 1>&2
 Synopsis:  ${0##*/} {-h}
                     {-d Output directory}
                     {-o Output file}
-                    {-f force}
+                    {-f   force}
+                    {-F noforce}
                     [list of input directories]
 
 Requires:
@@ -48,11 +49,12 @@ for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
 #--------------------------------------------------------------------------------
 #               Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "fhHd:o:" opt; do
+while getopts "fFhHd:o:" opt; do
     case $opt in
         d)   OutputDirectory="$OPTARG";;
         o)    OutputFileName="$OPTARG";;
         f)             force=1;;
+        F)             force=2;;
         h|H)  MAN; exit 0;;
     esac
 done
@@ -61,7 +63,7 @@ shift $(( OPTIND - 1 ))
 InputDirectory=${@:-$default_inputdir}
 
 if [ -z $OutputDirectory ]; then
-    printf "\nError: No Outputdirectory given.\n" 1>&2
+    printf "\nError: No Output-directory given.\n" 1>&2
     exit 1
 fi
 
@@ -94,15 +96,28 @@ function ExtractData {
     if [ ! -d "$OutputDirectory" ]; then mkdir -p "$OutputDirectory"; fi
     if [   -e "$TemporaryFile"   ]; then rm "${TemporaryFile}"; fi
 
+# if energy file already exists: check force value
+#   force = 0: ask if it should be removed
+#   force = 1: remove anyway
+#        else: do not remove energy file
     if [ -r "$EnergyFile" ]; then
-        echo "File \"$EnergyFile\" already exists!" 1>&2
-        if [ $force -eq 1 ]; then
-            echo "Force enabled, continuing anyway" 1>&2
-        else
-            echo "Aborting..." 1>&2
-            exit
+        if [ $force -eq 0 ]; then
+            printf "\nFile \"$EnergyFile\" already exists! Do you want to overwrite it? [y/n]\n" 1>&2
+
+            read answer
+            if [ ! -z $answer ]; then
+                if [ $answer = 'y' ]; then
+                    rm $EnergyFile
+                fi
+            fi
+
+        elif [ $force -eq 1 ]; then
+            printf "\tFile \"$EnergyFile\" already exists!\n" 1>&2
+            printf "\t\tForce enabled, continuing anyway\n"   1>&2
+            rm $EnergyFile
         fi
     fi
+    if [ -r "$EnergyFile" ]; then exit; fi
 
     for i in ${ModeDir}/*.log; do
             dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i)
