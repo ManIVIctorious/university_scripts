@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #--------------------------------------------------------------------------------
-#                               Default parameters 
+#                               Default parameters
 #--------------------------------------------------------------------------------
      ModePattern='modes_\d{2,}'
    DataDirectory="2D_mode_scans"
@@ -37,13 +37,38 @@ Description:
 
     The default values are:
         Output Directory  = $OutputDirectory
-        Output File Name  = outputdirectory/<Mode>_${OutputFileName}
+        Output File Name  = outputdirectory/<Mode>_<xpoints>x<ypoints>_${OutputFileName}
         Input Directories = '+${DataDirectory}/${ModePattern}+!d'
 
 EOF
 }
 export -f MAN
 for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+
+function overwrite {
+    file=$1
+
+# if force = 0: ask
+# if force = 1: overwrite anyway
+#         else: do not overwrite
+    if [ $force -eq 0 ]; then
+
+        printf "\tThe file \"$file\" already exists, do you want to overwrite it? [y/n]\n" 1>&2
+
+        read answer
+        if [ ! -z $answer ]; then
+            if [ $answer = 'y' ]; then
+                rm $file
+            fi
+        fi
+
+    elif [ $force -eq 1 ]; then
+        printf "\tThe file \"$file\" already exists, do you want to overwrite it? [y/n]\n" 1>&2
+        printf "\t\tForce enabled, continuing anyway\n" 1>&2
+        rm $file
+    fi
+}
+export -f overwrite
 
 
 #--------------------------------------------------------------------------------
@@ -90,35 +115,12 @@ function ExtractData {
           ModeDir="$1"
     if [ -z ModeDir ]; then echo "Input error" 1>&2; exit 1; fi
              Mode=${ModeDir##*/}
-       EnergyFile="${OutputDirectory}/${Mode}_${OutputFileName}"
     TemporaryFile="${OutputDirectory}/tmp_${Mode}"
 
     if [ ! -d "$OutputDirectory" ]; then mkdir -p "$OutputDirectory"; fi
     if [   -e "$TemporaryFile"   ]; then rm "${TemporaryFile}"; fi
 
-# if energy file already exists: check force value
-#   force = 0: ask if it should be removed
-#   force = 1: remove anyway
-#        else: do not remove energy file
-    if [ -r "$EnergyFile" ]; then
-        if [ $force -eq 0 ]; then
-            printf "\nFile \"$EnergyFile\" already exists! Do you want to overwrite it? [y/n]\n" 1>&2
-
-            read answer
-            if [ ! -z $answer ]; then
-                if [ $answer = 'y' ]; then
-                    rm $EnergyFile
-                fi
-            fi
-
-        elif [ $force -eq 1 ]; then
-            printf "\tFile \"$EnergyFile\" already exists!\n" 1>&2
-            printf "\t\tForce enabled, continuing anyway\n"   1>&2
-            rm $EnergyFile
-        fi
-    fi
-    if [ -r "$EnergyFile" ]; then exit; fi
-
+# get data from *.log files
     for i in ${ModeDir}/*.log; do
             dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i)
           e_hf=$(grep "SCF Done" $i | awk '{printf "%+.14lf\n", $5}')
@@ -132,24 +134,31 @@ function ExtractData {
     # check if the grid is fully populated:
     #   print and sort first and second column, get number of unique occurrences,
     #   if all values of dq1 occure dq2 times and vice versa the number of occurences is returned, else return -1
-        nq1="$(awk '{print $2}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
-        nq2="$(awk '{print $1}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
-    
+        nq1="$(awk '{printf "% .10lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+        nq2="$(awk '{printf "% .10lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+
         if [ $nq1 -eq -1 -o $nq2 -eq -1 ]; then
-            echo "Error: Inconsistent number of coordinates" 1>&2
+            echo "Error: Inconsistent number of coordinates in ${Mode}" 1>&2
+            #awk '{printf "% .10lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c
+            #awk '{printf "% .10lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c
             exit 1
         fi
-    
+
     # check if every column has 6 entries (q1 q2 E mu_x mu_y mu_z)
         control=$(awk 'BEGIN{ control = 0 }{ if(NF != 6){ control = -1; exit } }END{ print control }' ${TemporaryFile})
         if [ $control -ne 0 ]; then
             echo "Error: Column count not equal in all lines" 1>&2
             exit 2
         fi
-    
-        echo -e "N\t$nq1\t$nq2" > ${EnergyFile}
-        echo -e "#  delta x     delta y     Energy in hartree    dipolemoment(x,y,z) in debye" >> ${EnergyFile}
-        sort -g -k1 -k2 "${TemporaryFile}" | awk '{print $0}{if(NR%'$nq2' == 0){printf "\n"}}' >> ${EnergyFile}
+
+        EnergyFile="${OutputDirectory}/${Mode}_${nq1}x${nq2}_${OutputFileName}"
+        if [ -s "$EnergyFile" ]; then overwrite $EnergyFile; fi
+
+        if [ ! -s $EnergyFile ]; then
+            echo -e "N\t$nq1\t$nq2" > ${EnergyFile}
+            echo -e "#  delta x     delta y     Energy in hartree    dipolemoment(x,y,z) in debye" >> ${EnergyFile}
+            sort -g -k1 -k2 "${TemporaryFile}" | awk '{print $0}{if(NR%'$nq2' == 0){printf "\n"}}' >> ${EnergyFile}
+        fi
     fi
     if [ -e "${TemporaryFile}" ]; then rm "${TemporaryFile}"; fi
 }

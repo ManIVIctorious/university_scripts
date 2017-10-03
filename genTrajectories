@@ -86,7 +86,7 @@ for Directory in $InputDirectory; do
 
     if [ ! -d $Directory ]; then 
         printf "Directory \"$Directory\" does not exist.\n" 1>&2
-        printf "Please specify a (list of) valid input directories!\n" 1>&2
+        printf "Please specify (a list of) valid input directories!\n" 1>&2
         printf "Skipping...\n" 1>&2
         continue
     fi
