@@ -8,6 +8,7 @@
 default_inputdir=$(ls -d ${DataDirectory}/* 2>/dev/null | grep -P "$ModePattern" )
  OutputDirectory="${DataDirectory}/numerov2d"
   OutputFileName="energies.dat"
+       Threshold=12
            force=0
 
 
@@ -20,6 +21,7 @@ cat << EOF 1>&2
 Synopsis:  ${0##*/} {-h}
                     {-d Output directory}
                     {-o Output file}
+                    {-t threshold}
                     {-f   force}
                     {-F noforce}
                     [list of input directories]
@@ -34,11 +36,13 @@ Description:
         - SCF energies
         - x-/y-/z- dipole moments
     to an output file and verifies that all entries are populated
+    Threshold corresponds to the number of digits after zero for the coordinates
 
     The default values are:
         Output Directory  = $OutputDirectory
         Output File Name  = outputdirectory/<Mode>_<xpoints>x<ypoints>_${OutputFileName}
         Input Directories = '+${DataDirectory}/${ModePattern}+!d'
+        Threshold         = $Threshold
 
 EOF
 }
@@ -74,10 +78,11 @@ export -f overwrite
 #--------------------------------------------------------------------------------
 #               Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "fFhHd:o:" opt; do
+while getopts "fFhHd:o:t:" opt; do
     case $opt in
         d)   OutputDirectory="$OPTARG";;
         o)    OutputFileName="$OPTARG";;
+        t)         Threshold="$OPTARG";;
         f)             force=1;;
         F)             force=2;;
         h|H)  MAN; exit 0;;
@@ -102,10 +107,12 @@ for iteration in $InputDirectory; do
     fi
 done
 
+
 export InputDirectory
 export OutputDirectory
 export OutputFileName
 export force
+export Threshold
 
 
 #--------------------------------------------------------------------------------
@@ -122,7 +129,7 @@ function ExtractData {
 
 # get data from *.log files
     for i in ${ModeDir}/*.log; do
-            dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i)
+            dq=$(sed "s/\.log$//; s/.*dr=//; s/_/\t/" <<< $i | awk '{printf "%+.'$Threshold'lf\t%+.'$Threshold'lf\n", $1, $2}')
           e_hf=$(grep "SCF Done" $i | awk '{printf "%+.14lf\n", $5}')
         dipole=$(grep -A1 "Dipole moment" $i | tail -n1 | awk '{printf "%+.14lf    %+.14lf    %+.14lf\n", $2, $4, $6}')
 
@@ -134,13 +141,13 @@ function ExtractData {
     # check if the grid is fully populated:
     #   print and sort first and second column, get number of unique occurrences,
     #   if all values of dq1 occure dq2 times and vice versa the number of occurences is returned, else return -1
-        nq1="$(awk '{printf "% .10lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
-        nq2="$(awk '{printf "% .10lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+        nq1="$(awk '{printf "% .'$Threshold'lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
+        nq2="$(awk '{printf "% .'$Threshold'lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c | awk '{if(NR == 1){control = $1}}{if($1 != control){control = -1; exit}}END{print control}')"
 
         if [ $nq1 -eq -1 -o $nq2 -eq -1 ]; then
             echo "Error: Inconsistent number of coordinates in ${Mode}" 1>&2
-            #awk '{printf "% .10lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c
-            #awk '{printf "% .10lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c
+            #awk '{printf "% .'$Threshold'lf\n", $2}' "${TemporaryFile}" | sort -g | uniq -c
+            #awk '{printf "% .'$Threshold'lf\n", $1}' "${TemporaryFile}" | sort -g | uniq -c
             exit 1
         fi
 

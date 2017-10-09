@@ -7,6 +7,7 @@ EConvFactor="2625.49962" # (kJ/mol) / hartree
   OutputDir="." #relative to InputDir
       force=0
      nodiff=0
+  Threshold="12"
 
 #--------------------------------------------------------------------------------
 #                              Function definition
@@ -41,10 +42,11 @@ export -f overwrite
 #--------------------------------------------------------------------------------
 #              Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "i:o:fFnhH" opt; do
+while getopts "i:o:t:fFnhH" opt; do
     case $opt in
         i)   InputDir="$OPTARG";;
         o)  OutputDir="$OPTARG";;
+        t)  Threshold="$OPTARG";;
         f)      force=1;;
         F)      force=2;;
         n)     nodiff=1;;
@@ -68,15 +70,19 @@ fi
 
 # Get energies of 2D mode scans
 if   [ $force -eq 1 ]; then
-    get2Denergies -f
+    get2Denergies -t ${Threshold} -f
 elif [ $force -eq 2 ]; then
-    get2Denergies -F
+    get2Denergies -t ${Threshold} -F
 else
-    get2Denergies
+    get2Denergies -t ${Threshold}
 fi
 
 if [ ! -d  $InputDir ]; then echo "Please specify a valid input directory"  1>&2; exit; fi
 if [ ! -d $OutputDir ]; then echo "Please specify a valid output directory" 1>&2; exit; fi
+
+# To compensate for rounding errors by awk,
+#   the Threshold for the Numerov procedure has to be reduced by one digit
+Threshold=$((Threshold - 1))
 
 # Generate Numerov2D data files and their potential's 2D differentiations
 cd ${InputDir}
@@ -88,14 +94,14 @@ for EnergyFile in *_energies.dat; do
         outfile=${OutfilePrefix}_ads=0.dat
         if [   -e $outfile ]; then overwrite $outfile; fi
         if [ ! -e $outfile ]; then
-            numerov2d -i ${EnergyFile} -m1 -k1 -v ${EConvFactor} -n ${StencilSize} -ads0 -o $outfile
+            numerov2d -t 1E-${Threshold} -i ${EnergyFile} -m1 -k1 -v ${EConvFactor} -n ${StencilSize} -ads0 -o $outfile
         fi
         
     # 2DNumerov with splining
         outfile=${OutfilePrefix}_ads=1.dat
         if [   -e $outfile ]; then overwrite $outfile; fi
         if [ ! -e $outfile ]; then
-            numerov2d -i ${EnergyFile} -m1 -k1 -v ${EConvFactor} -n ${StencilSize} -ads1 -o $outfile
+            numerov2d -t 1E-${Threshold} -i ${EnergyFile} -m1 -k1 -v ${EConvFactor} -n ${StencilSize} -ads1 -o $outfile
         fi
 
     done

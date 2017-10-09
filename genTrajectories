@@ -4,6 +4,7 @@
 #                               Default parameters 
 #--------------------------------------------------------------------------------
 NumberOfAtoms="$(awk 'END{print NR}' coords)"
+    Threshold=12
         force=0
 
   ModePattern='modes_\d{2,}'
@@ -17,6 +18,7 @@ function MAN {
 cat << EOF 1>&2
 
 Synopsis:  ${0##*/} {-h}
+                    {-t Threshold}
                     {-f   force}
                     {-F noforce}
                     [list of input directories]
@@ -25,6 +27,7 @@ Description:
     Takes a list of 2D mode scan directories and extracts the
     full coordinates, as well as the coordinates alongside the 
     individual modes to three xyz-files.
+    Threshold is the number of digits after zero for the coordinate entries
 
     The default values are:
         Input Directories = '+${DataDirectory}/${ModePattern}+!d'
@@ -63,9 +66,10 @@ export -f overwrite
 #--------------------------------------------------------------------------------
 #               Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "fFhHn:" opt; do
+while getopts "fFhHn:t:" opt; do
     case $opt in
         n)     NumberOfAtoms="$OPTARG";;
+        t)         Threshold="$OPTARG";;
         f)             force=1;;
         F)             force=2;;
         h|H)  MAN; exit 0;;
@@ -77,7 +81,6 @@ export force
 
 InputDirectory=${@:-$default_dir}
 if [ -z $NumberOfAtoms ]; then echo "Please enter a valid number of atoms" 1>&2; exit 0; fi
-
 
 #--------------------------------------------------------------------------------
 #                             Actual start of Script
@@ -107,20 +110,34 @@ for Directory in $InputDirectory; do
     file=traj_01.xyz
     if [ -f $file ]; then overwrite $file; fi
     if [ ! -f $file ]; then
+
         for i in *dr=*_+0.00000000000000.com; do
+            sed "s/[^=]*=//; s/_.*$//; s/^\s*\([+-][^.]*\)\.\([0-9]\{$Threshold\}\).*$/\1.\2/" <<< $i
+        done > tmp
+
+        for i in $(sort -g tmp); do
             printf "$NumberOfAtoms\n\n"
-            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
+            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" *dr=$i*_+0.00000000000000.com
         done > $file
+        rm tmp
+
     fi
     
 # Trajectory of mode B
     file=traj_02.xyz
     if [ -f $file ]; then overwrite $file; fi
     if [ ! -f $file ]; then
+
         for i in *dr=+0.00000000000000_*.com; do
+            sed "s/\.com//; s/^\s*\([+-][^.]*\)\.\([0-9]\{$Threshold\}\).*$/\1.\2/" <<< ${i##*_}
+        done > tmp
+
+        for i in $(sort -g tmp); do
             printf "$NumberOfAtoms\n\n"
-            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
+            grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" *dr=+0.00000000000000_${i}*.com
         done > $file
+        rm tmp
+
     fi
 
     cd - 1>/dev/null 2>&1
