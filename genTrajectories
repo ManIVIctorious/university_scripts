@@ -3,7 +3,7 @@
 #--------------------------------------------------------------------------------
 #                               Default parameters 
 #--------------------------------------------------------------------------------
-NumberOfAtoms="$(awk 'END{print NR}' coords)"
+NumberOfAtoms="$(awk 'END{print NR}' coords 2>/dev/null)"
     Threshold=12
         force=0
 
@@ -80,6 +80,9 @@ shift $(( OPTIND - 1 ))
 export force
 
 InputDirectory=${@:-$default_dir}
+
+# If no number of atoms is given and getting it from coords file
+#   doesn't seem possible print an error.
 if [ -z $NumberOfAtoms ]; then echo "Please enter a valid number of atoms" 1>&2; exit 0; fi
 
 #--------------------------------------------------------------------------------
