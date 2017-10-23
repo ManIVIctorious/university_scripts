@@ -42,7 +42,7 @@ export -f overwrite
 #--------------------------------------------------------------------------------
 #              Populate variables and provide input error handling
 #--------------------------------------------------------------------------------
-while getopts "i:o:t:fFnhH" opt; do
+while getopts "i:o:t:N:fFnhH" opt; do
     case $opt in
         i)   InputDir="$OPTARG";;
         o)  OutputDir="$OPTARG";;
@@ -50,6 +50,7 @@ while getopts "i:o:t:fFnhH" opt; do
         f)      force=1;;
         F)      force=2;;
         n)     nodiff=1;;
+        N)     NAtoms="$OPTARG";;
         h|H)  MAN; exit 0;;
     esac
 done
@@ -60,13 +61,20 @@ shift $(( OPTIND - 1 ))
 #                            Actual beginning of Script
 #--------------------------------------------------------------------------------
 # Generate trajectories for individual 2D modes
-if   [ $force -eq 1 ]; then
-    genTrajectories -f
-elif [ $force -eq 2 ]; then
-    genTrajectories -F
-else
-    genTrajectories
+#   define command for trajectory generation
+trajcommand="genTrajectories"
+if [ ! -z $NAtoms ]; then
+    trajcommand="$trajcommand -n $NAtoms"
 fi
+
+if   [ $force -eq 1 ]; then
+    trajcommand="$trajcommand -f"
+elif [ $force -eq 2 ]; then
+    trajcommand="$trajcommand -F"
+fi
+
+#   execute trajectory generation
+$trajcommand
 
 # Get energies of 2D mode scans
 if   [ $force -eq 1 ]; then
