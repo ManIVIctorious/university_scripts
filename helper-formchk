@@ -1,6 +1,6 @@
 #!/bin/bash
 
 for i in *.chk; do
-    /usr/local/g09/formchk $i
+    formchk $i
     fchk-extractor ${i%.chk}.fchk normal_modes_${i%.chk}
 done
