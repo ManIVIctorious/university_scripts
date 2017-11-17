@@ -1,0 +1,227 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------------------
+#                                      Defaults
+#--------------------------------------------------------------------------------
+  ZetaFileOut="zetafile"
+     MassFile="../masses"
+
+function MAN {
+    cat << EOF
+Synopsis: ${0##*/} {h}
+             -m <modefile> (n times)
+            [-M masses files]
+            [-o <output file>]
+
+            [-z <coefficients-file> output]
+            [-Z <coefficients-file>  input] (if not set same as -z)
+
+            [-1 only operate Coriolis coefficient generation]
+            [-2 only operate correction of moment of inertia]
+            [-D dimension override] (only to be used with -2)
+
+    last:   [list of coordinate files with file names containing the
+
+Description:
+    This script simplifies the usage of the coriolis coefficient calculation
+    and the consequent correction of the moment of inertia.
+
+    As minimal input it takes a masses file and the n respective mode files
+        e.g. ${0##*/} -m ../modes/mode_01 -m ../modes/mode_02 -M ../masses
+    and outputs the deviations, the Coriolis coefficients (upper triangle
+    without main diagonal)  and the upper triangle of the
+    "effective reciprocal inertia tensor"
+
+    The default values are:
+        MassFile       $MassFile
+        ZetaFileOut    $ZetaFileOut
+
+EOF
+}
+export -f MAN
+
+for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+if [[ $# > 4 ]]; then MAN; exit 1; fi
+
+
+#--------------------------------------------------------------------------------
+#              Populate variables and provide input error handling
+#--------------------------------------------------------------------------------
+dimension=0; onlyoperate=0;
+while getopts "z:Z:m:M:o:D:12hH" opt; do
+    case $opt in
+        z)  ZetaFileOut="$OPTARG";;
+        Z)   ZetaFileIn="$OPTARG";;
+        M)     MassFile="$OPTARG";;
+        o)   OutputFile="$OPTARG";;
+
+        m)    dimension=$((dimension + 1))
+              modefile[$dimension]="$OPTARG";;
+
+        D)    dimension="$OPTARG";;
+        1)  onlyoperate=1;;
+        2)  onlyoperate=2;;
+
+        h|H)  MAN; exit 0;;
+    esac
+done
+shift $(( OPTIND - 1 ))
+
+# if no input coordinate files are explicitly given set them to *.com
+  CoordinateFiles=${@:-*.com}
+
+# if no ZetaFileIn is set, set it to ZetaFileOut
+  if [ -z $ZetaFileIn ]; then ZetaFileIn="$ZetaFileOut"; fi
+
+#--------------------------------------------------------------------------------
+# Error handling  Error handling  Error handling  Error handling  Error handling
+#--------------------------------------------------------------------------------
+
+# dimension values:
+# due to regex the dimension is limited to integers in {1,2,3,4,5,6,7,8,9}
+# For the Coriolis correction the number of modes must be greater than 2
+  if [ $dimension -gt 9 -o $dimension -lt 2 ]; then
+    printf "\n (-) Error: Number of modes invalid"
+    printf "\n     The number of modes ($dimension) must be in {2,3,4,5,6,7,8,9}"
+    printf "\n     Aborting...\n\n"
+    exit
+  fi
+
+
+# Files required for Coriolis coefficients
+if [ $onlyoperate -ne 2 ]; then
+
+  # modefiles:
+  # Check if all modefiles are set, exist and are readable files
+  for index in $(seq 1 $dimension); do
+    if [ -z ${modefile[$index]} ]; then
+      printf "\n (-) Error: modefile[$index] not set"
+      printf "\n     Aborting...\n\n"
+      exit
+    elif [ ! -r ${modefile[$index]} ]; then
+      printf "\n (-) Error: modefile[$index] not readable"
+      printf "\n     Aborting...\n\n"
+      exit
+    fi
+  done
+
+  # coefficients file output
+  if [ -z $ZetaFileOut ]; then
+    printf "\n (-) Error: Coefficients file output not set"
+    printf "\n     Aborting...\n\n"
+    exit
+  fi
+
+fi
+
+
+# Files required for Watson Correction
+if [ $onlyoperate -ne 1 ]; then
+
+  # mass file
+  # check if mass file is set
+  # and if it is readable
+    if [ -z $MassFile ]; then
+      printf "\n (-) Error: MassFile not set"
+      printf "\n     Aborting...\n\n"
+      exit
+    elif [ ! -r $MassFile ]; then
+      printf "\n (-) Error: Massfile not readable"
+      printf "\n     Aborting...\n\n"
+      exit
+    fi
+
+  # coefficients file input
+  # If ZetaFileIn and ZetaFileOut aren't the same:
+  # check if ZetaFileIn can be read
+    if [ -z $ZetaFileIn ]; then
+      printf "\n (-) Error: Coefficients file input not set"
+      printf "\n     Aborting...\n\n"
+      exit
+    elif [ $ZetaFileIn != $ZetaFileOut ]; then
+      if [ ! -r $ZetaFileIn ]; then
+        printf "\n (-) Error: $ZetaFileIn not readable"
+        printf "\n     Aborting...\n\n"
+        exit
+      fi
+    fi
+
+  # coordinate files
+    if [ -z "$CoordinateFiles" ]; then
+      printf "\n (-) Error: No Coordinate files set"
+      printf "\n     Aborting...\n\n"
+      exit
+    else
+      for i in $CoordinateFiles; do
+        if [ ! -r $i ]; then
+          printf "\n (-) Error: $i not readable"
+          printf "\n     Aborting...\n\n"
+          exit
+        fi
+      done
+    fi
+
+  # output file
+  # If output file is not set print to stdout
+    if [ -z $OutputFile ]; then
+        OutputFile=/dev/stdout
+    fi
+
+fi
+
+
+# Coriolis Coefficients:
+  ProgramName="coriolis_coefficients"
+#--------------------------------------------------------------------------------
+if [ $onlyoperate -eq 0 -o $onlyoperate -eq 1 ]; then
+
+# generate and execute ExecLine
+  ExecLine="$ProgramName"
+  for index in $(seq 1 $dimension); do
+    ExecLine="$ExecLine -m ${modefile[$index]}"
+  done
+  ExecLine="$ExecLine -o $ZetaFileOut"
+
+#printf "Execution Line:\t$ExecLine\n"
+  $ExecLine
+
+fi
+
+
+# Watson Correction:
+  ProgramName="watson_correction"
+#--------------------------------------------------------------------------------
+if [ $onlyoperate -eq 0 -o $onlyoperate -eq 2 ]; then
+
+# generate Header
+  ExecLine="$ProgramName -LD $dimension -o $OutputFile"
+  $ExecLine
+
+# generate and execute ExecLine
+  for InputFile in $CoordinateFiles; do
+
+    ExecLine="$ProgramName -z $ZetaFileIn -m $MassFile -c $InputFile"
+
+  # get deviations from file names and store them in the array deviation[]
+    index=0
+    for entry in $(echo $InputFile | grep -Po "[+-]?\d+\.\d+"); do
+      index=$((index + 1))
+      deviation[$index]=$entry
+    done
+
+  # generate execution line and check that at least
+  #   $dimension entries exist for deviation[] array
+    for index in $(seq 1 $dimension); do
+        if [ -z ${deviation[$index]} ]; then
+          printf "\n (-) Error: Too few deviations found in file name"
+          printf "\n     Aborting..."
+          exit
+        fi
+        ExecLine="$ExecLine -d ${deviation[$index]}"
+    done
+
+#printf "Execution Line:\t$(sed "s/-[A-Za-z]\+/\t&/g" <<< $ExecLine)\n"
+    $ExecLine
+  done | sort -g -k1 -k2 >> $OutputFile
+
+fi
