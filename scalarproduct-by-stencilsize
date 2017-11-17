@@ -25,7 +25,7 @@ Description:
     Afterwards outputs the scalar products of the analytical mode
     with the CC and the CC's reduced masses for differen 2D stencil
     sizes.
-        
+
     The default values are:
         analyt_normal_mode  $default_analyt_normal_mode
         output_file         $default_output_file
@@ -74,7 +74,7 @@ if [ $output_file != $default_output_file ]; then
     if [ -e $output_file ]; then
         printf "The file \"$output_file\" already exists, do you want to delete it? [y/n]\n" 1>&2
         read var
-    
+
         if [ $var = y ]; then
             rm $output_file
         else
@@ -86,34 +86,34 @@ fi
 
 for sx in $(seq 3 2 13); do
     Hess=$(2d_differenciation -i $potential -x $sx | grep -P "^\s*[- ]0\.0{14}\s*[- ]0\.0{14}\s*[- ]" | awk '{printf "[%.14lf,%.14lf;%.14lf,%.14lf]\n", $(NF-2), $NF, $NF, $(NF-1)}')
-    
+
     printf "\n2D diff stencil size = ${sx}x${sx}\n" >> $output_file
     octave --silent --no-gui << EOF >> $output_file
         format long;
-        
+
     # input
         analyt = load("$analyt_normal_mode");
         const1 = load("$constructed_mode_1");
         const2 = load("$constructed_mode_2");
-        
+
     # construct combination modes
         [evec, eval] = eig($Hess);
         comb_1 = evec(1,1) * const1(:,1:3) + evec(2,1) * const2(:,1:3);
         comb_2 = evec(1,2) * const1(:,1:3) + evec(2,2) * const2(:,1:3);
         comb_1(:,4) = comb_2(:,4) = analyt(:,4);
-        
+
     # calculate scalar product with analytic mode
         sc_analyt = sum(sum(analyt(:,1:3).*analyt(:,1:3)));
         sc_comb_1 = sum(sum(comb_1(:,1:3).*analyt(:,1:3)));
         sc_comb_2 = sum(sum(comb_2(:,1:3).*analyt(:,1:3)));
-        
+
     # calculate masses
         mass_analyt=sum(sum(analyt(:,1:3).^2 .* analyt(:,4)));
         mass_const1=sum(sum(const1(:,1:3).^2 .* const1(:,4)));
         mass_const2=sum(sum(const2(:,1:3).^2 .* const2(:,4)));
         mass_comb_1=sum(sum(comb_1(:,1:3).^2 .* comb_1(:,4)));
         mass_comb_2=sum(sum(comb_2(:,1:3).^2 .* comb_2(:,4)));
-        
+
     # output
         fd=stdout;
         fprintf(fd, "sc/mass analyt\t%.8f\t%.8f\n", sc_analyt, mass_analyt);

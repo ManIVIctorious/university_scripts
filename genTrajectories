@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #--------------------------------------------------------------------------------
-#                               Default parameters 
+#                               Default parameters
 #--------------------------------------------------------------------------------
 NumberOfAtoms="$(awk 'END{print NR}' coords 2>/dev/null)"
     Threshold=12
@@ -25,7 +25,7 @@ Synopsis:  ${0##*/} {-h}
 
 Description:
     Takes a list of 2D mode scan directories and extracts the
-    full coordinates, as well as the coordinates alongside the 
+    full coordinates, as well as the coordinates alongside the
     individual modes to three xyz-files.
     Threshold is the number of digits after zero for the coordinate entries
 
@@ -39,7 +39,7 @@ for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
 
 function overwrite {
     file=$1
-    
+
 # if force = 0: ask
 # if force = 1: overwrite anyway
 #         else: do not overwrite
@@ -90,7 +90,7 @@ if [ -z $NumberOfAtoms ]; then echo "Please enter a valid number of atoms" 1>&2;
 #--------------------------------------------------------------------------------
 for Directory in $InputDirectory; do
 
-    if [ ! -d $Directory ]; then 
+    if [ ! -d $Directory ]; then
         printf "Directory \"$Directory\" does not exist.\n" 1>&2
         printf "Please specify (a list of) valid input directories!\n" 1>&2
         printf "Skipping...\n" 1>&2
@@ -108,7 +108,7 @@ for Directory in $InputDirectory; do
             grep -P "^\s*[A-Z][a-z ]\s*[- ]\d+\.\d+" $i
         done > $file
     fi
-    
+
 # Trajectory of mode A
     file=traj_01.xyz
     if [ -f $file ]; then overwrite $file; fi
@@ -125,7 +125,7 @@ for Directory in $InputDirectory; do
         rm tmp
 
     fi
-    
+
 # Trajectory of mode B
     file=traj_02.xyz
     if [ -f $file ]; then overwrite $file; fi

@@ -14,7 +14,7 @@ EConvFactor="2625.49962" # (kJ/mol) / hartree
 #--------------------------------------------------------------------------------
 function overwrite {
     file=$1
-    
+
     # if output files already exist check force status
     #   force = 0: ask
     #   force = 1: continue output anyway
@@ -104,7 +104,7 @@ for EnergyFile in *_energies.dat; do
         if [ ! -e $outfile ]; then
             numerov2d -t 1E-${Threshold} -i ${EnergyFile} -m1 -k1 -v ${EConvFactor} -n ${StencilSize} -ads0 -o $outfile
         fi
-        
+
     # 2DNumerov with splining
         outfile=${OutfilePrefix}_ads=1.dat
         if [   -e $outfile ]; then overwrite $outfile; fi
@@ -115,7 +115,7 @@ for EnergyFile in *_energies.dat; do
     done
 
 # 2D differentiation of potential
-    infile=${OutfilePrefix}_ads=0.dat 
+    infile=${OutfilePrefix}_ads=0.dat
     if [ ! -e $infile  ]; then continue; fi
     if [ $nodiff -eq 1 ]; then continue; fi
 

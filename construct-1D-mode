@@ -5,7 +5,7 @@ default_coordinate_file="coords"
 
 function MAN {
     cat << EOF
-Synopsis: ${0##*/} {h} 
+Synopsis: ${0##*/} {h}
             First  line number
             Second line number
             [Output file]
@@ -43,7 +43,7 @@ fi
 
 if [ -e $output_file ]; then
     printf "Outputfile \"$output_file\" already exists, do you want to delete it? [y/n]\n" 1>&2
-    
+
     read answer
     if [[ $answer != 'y' ]]; then
         printf "Outputfile \"$output_file\" will be preserved\n" 1>&2

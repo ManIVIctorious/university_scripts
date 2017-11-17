@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #--------------------------------------------------------------------------------
-#                               Default parameters 
+#                               Default parameters
 #--------------------------------------------------------------------------------
 #   for octave
         mode_A="modes/constructed_mode_101"
@@ -29,7 +29,7 @@ Synopsis:  ${0##*/} {-h}
                     {-B Second combined mode}
                     {-s Stencil size of 2d_differenciation}
                     {-d Output 2D diff to file}
-    
+
 Requires:
     GNU/Octave
     2d_differenciation
@@ -100,7 +100,7 @@ shift $(( OPTIND - 1 ))
     if [ -e $cc_mode_A      ]; then
         printf "File \"$cc_mode_A\" already exists, do you want to overwrite it?[y/n]\n" 1>&2
         read val
-        
+
         if [[ $val != 'y' ]]; then
             printf "Aborting...\n\n"
             exit 3
@@ -110,18 +110,18 @@ shift $(( OPTIND - 1 ))
     if [ -e $cc_mode_B      ]; then
         printf "File \"$cc_mode_B\" already exists, do you want to overwrite it?[y/n]\n" 1>&2
         read val
-        
+
         if [[ $val != 'y' ]]; then
             printf "Aborting...\n\n"
             exit 3
         fi
     fi
- 
+
     if [ ! -z $output_2d_diff ]; then
         if [ -e $output_2d_diff ]; then
             printf "File \"$output_2d_diff\" already exists, do you want to overwrite it?[y/n]\n" 1>&2
             read val
-            
+
             if [[ $val != 'y' ]]; then
                 printf "Aborting...\n\n"
                 exit 3
@@ -151,7 +151,7 @@ format long
     c_mode_1 = load("$mode_A");
     c_mode_2 = load("$mode_B");
     masses   = load("$masses");
-    
+
 # diagonalisation
     [evec, eval] = eig($Hess);
 
@@ -173,7 +173,7 @@ format long
         fprintf(stderr, "\n")
     endfor
     fprintf(stderr, "\n")
-    
+
 # construct combined modes
     cc_mode_1 = c_mode_1(:,1:3) * evec(1,1) + c_mode_2(:,1:3) * evec(2,1);
     cc_mode_2 = c_mode_1(:,1:3) * evec(1,2) + c_mode_2(:,1:3) * evec(2,2);
