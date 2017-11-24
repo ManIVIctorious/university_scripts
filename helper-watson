@@ -41,7 +41,6 @@ EOF
 export -f MAN
 
 for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
-if [[ $# > 4 ]]; then MAN; exit 1; fi
 
 
 #--------------------------------------------------------------------------------
