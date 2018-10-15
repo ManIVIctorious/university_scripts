@@ -62,7 +62,7 @@ file=$1
   printfunction "  Intensity of second peak\n"
   printfunction "  (default: first peak value):  \t"
     read I2
-  
+
 # fit range
   printfunction "  Minimum x range (default '*'):\t"
     read xmin
@@ -72,7 +72,7 @@ file=$1
     read ymin
   printfunction "  Maximum y range (default '*'):\t"
     read ymax
-  
+
 # peak width
   printfunction "  First  peak width (default: 0.001):\t"
     read W1
@@ -122,7 +122,7 @@ file=$1
 
     fitymin=${ymin}
     fitymax=${ymax}
-  
+
   else
 
     if [ $(bc -l <<< "${ymin} < ${ymax}") -eq 1 ]; then

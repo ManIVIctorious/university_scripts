@@ -20,7 +20,10 @@ Synopsis: ${0##*/} {h}
             [-2 only operate correction of moment of inertia]
             [-D dimension override] (only to be used with -2)
 
-    last:   [list of coordinate files with file names containing the
+    last:   [list of coordinate files (*.com)]
+
+    Note:   The filenames of the com files must contain the deviations
+            in the form _dr=<coords>\(_<coords>\)\{D-1\}.com
 
 Description:
     This script simplifies the usage of the coriolis coefficient calculation
