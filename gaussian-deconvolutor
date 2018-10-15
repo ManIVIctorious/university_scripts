@@ -1,0 +1,170 @@
+#!/bin/bash
+
+# the printfunction only outputs if stdin is a terminal
+#  if the script has been invoked by redirect, e.g. < infile
+#  the printing of questions will be omitted
+function printfunction {
+    if [ -t 0 ]; then printf "$@"; fi
+}
+
+file=$1
+
+# read values from command line
+# file name
+  if [ -z ${file} ]; then
+    if [ -t 0 ]; then
+      printf "No input file name set, printing directory content:\n"
+      ls -lh --color | tail -n+2
+      printf "  \nInput file name:\t"
+    fi
+    read file
+    printf "\n"
+  fi
+
+# check file existence
+  if [ ! -f "${file}" ]; then
+    printf "\n(-) Error: The file \"${file}\" does not exist"
+    printf "\n    Aborting...\n\n"
+    exit
+  fi
+
+  printfunction "Please insert start values for the fit\n"
+# peak positions
+  printfunction "  First expected peak position: \t"
+    read X1
+
+    if [ -z ${X1} ]; then
+      printf "\n(-) Error: Expected peak position required"
+      printf "\n    Aborting...\n\n"
+      exit
+    fi
+
+  printfunction "  Second expected peak position:\t"
+    read X2
+
+    if [ -z ${X2} ]; then
+      printf "\n(-) Error: Expected peak position required"
+      printf "\n    Aborting...\n\n"
+      exit
+    fi
+
+# peak intensities
+  printfunction "  Intensity of first peak:      \t"
+    read I1
+
+    if [ -z ${I1} ]; then
+      printf "\n(-) Error: Peak intensity required, if unknown"
+      printf "\n    use intensity of convoluted peak"
+      printf "\n    Aborting...\n\n"
+      exit
+    fi
+
+  printfunction "  Intensity of second peak\n"
+  printfunction "  (default: first peak value):  \t"
+    read I2
+  
+# fit range
+  printfunction "  Minimum x range (default '*'):\t"
+    read xmin
+  printfunction "  Maximum x range (default '*'):\t"
+    read xmax
+  printfunction "  Minimum y range (default '*'):\t"
+    read ymin
+  printfunction "  Maximum y range (default '*'):\t"
+    read ymax
+  
+# peak width
+  printfunction "  First  peak width (default: 0.001):\t"
+    read W1
+  printfunction "  Second peak width (default: 0.001):\t"
+    read W2
+
+# output file
+  printfunction "  Output file (default: /dev/null):  \t"
+    read outputfile
+
+# additional formatting
+  printfunction "\n"
+
+
+# if unset, set default values
+  if [ -z ${I2} ]; then I2=${I1}; fi
+  if [ -z ${W1} ]; then W1=0.001; fi
+  if [ -z ${W2} ]; then W2=0.001; fi
+  if [ -z ${outputfile} ]; then outputfile="/dev/null"; fi
+
+# for plotting the range minimum can be greater than its maximum
+#  (inverted plot), but for the fitting procedure this is not possible
+#  therefore define sorted fitting ranges to allow a reverse plot output
+#  combined with a working fit
+  if [ -z ${xmin} -o -z ${xmax} ]; then
+    if [ -z ${xmin} ]; then xmin='*'; fi
+    if [ -z ${xmax} ]; then xmax='*'; fi
+
+    fitxmin=${xmin}
+    fitxmax=${xmax}
+
+  else
+
+    if [ $(bc -l <<< "${xmin} < ${xmax}") -eq 1 ]; then
+      fitxmin=${xmin}
+      fitxmax=${xmax}
+    else
+      fitxmin=${xmax}
+      fitxmax=${xmin}
+    fi
+
+  fi
+
+  if [ -z ${ymin} -o -z ${ymax} ]; then
+    if [ -z ${ymin} ]; then ymin='*'; fi
+    if [ -z ${ymax} ]; then ymax='*'; fi
+
+    fitymin=${ymin}
+    fitymax=${ymax}
+  
+  else
+
+    if [ $(bc -l <<< "${ymin} < ${ymax}") -eq 1 ]; then
+      fitymin=${ymin}
+      fitymax=${ymax}
+    else
+      fitymin=${ymax}
+      fitymax=${ymin}
+    fi
+
+  fi
+
+
+# get fit parameters by leveraging gnuplot
+gnuplot -persist << EOF 2>&1 | sed '/Final set of parameters/,$!d' | tee ${outputfile}
+
+# fill values from bash part
+    file = "${file}"
+    X1   = ${X1}
+    X2   = ${X2}
+    I1   = ${I1}
+    I2   = ${I2}
+    W1   = ${W1}
+    W2   = ${W2}
+
+# formula for convolution of two gaussian peaks
+    f1(x) =  I1 * exp( -W1 * (x - X1)**2 )
+    f2(x) =  I2 * exp( -W2 * (x - X2)**2 )
+    fu(x)  = f1(x) + f2(x)
+
+# actual fitting procedure
+    FIT_LIMIT = 1e-06
+    fit [${fitxmin}:${fitxmax}] [${fitymin}:${fitymax}] fu(x) file u 1:2 via I1, W1, X1, I2, W2, X2
+
+
+# output a plot of the fit
+    set samples 1000
+    set xrange [${xmin}:${xmax}]
+    set yrange [${ymin}:${ymax}]
+    plot file u 1:2 w l,\
+         f1(x),\
+         f2(x),\
+         fu(x)
+
+EOF
