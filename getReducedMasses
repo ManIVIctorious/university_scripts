@@ -1,0 +1,80 @@
+#!/bin/bash
+
+#--------------------------------------------------------------------------------
+#                               Default parameters
+#--------------------------------------------------------------------------------
+   ModeFiles=mode_*
+  OutputFile=reduced_masses
+
+
+#--------------------------------------------------------------------------------
+#                                Print help page
+#--------------------------------------------------------------------------------
+function MAN {
+cat << EOF 1>&2
+
+Synopsis:  ${0##*/} {-h}
+                    {-o Output file}
+                    [list of mode files]
+
+Description:
+    Takes a number of mode files and calculates their reduced masses,
+    as well as the square root of the quotient of the lightest mass
+    and the respective mass. (sqrt(min_mass/mass[i]))
+
+    This information is saved to the output file
+
+    The default values are:
+        Output File = $OutputFile
+        Mode Files  = $ModeFiles
+
+EOF
+}
+export -f MAN
+for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+
+
+#--------------------------------------------------------------------------------
+#               Populate variables and provide input error handling
+#--------------------------------------------------------------------------------
+while getopts "hHo:" opt; do
+    case $opt in
+        o)    OutputFile="$OPTARG";;
+        h|H)  MAN; exit 0;;
+    esac
+done
+shift $(( OPTIND - 1 ))
+
+ModeFiles=${@:-$ModeFiles}
+
+
+#--------------------------------------------------------------------------------
+#                             Actual start of Script
+#--------------------------------------------------------------------------------
+for i in $ModeFiles; do
+
+    printf "${i##*/}\t"
+
+    awk 'BEGIN{ sum = 0 }
+        {
+            sum += ($1*$1 + $2*$2 + $3*$3) * $4
+        }
+        END{
+            printf "% .12le\n", sum
+        }' $i
+
+done | awk '
+    {
+        if(NR == 1){ min_mass = $2 }
+
+        mode_name[NR] = $1;
+        mode_mass[NR] = $2;
+
+        if(min_mass > $2){ min_mass = $2 }
+
+    }
+    END{
+        for(i = 1; i <= NR; ++i){
+            printf "\t%s\t% 18.12lf\t% 18.12lf\n", mode_name[i], mode_mass[i], sqrt(min_mass/mode_mass[i])
+        }
+    }' > $OutputFile
