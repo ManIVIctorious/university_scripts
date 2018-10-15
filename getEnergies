@@ -3,7 +3,7 @@
 #--------------------------------------------------------------------------------
 #                               Default parameters
 #--------------------------------------------------------------------------------
-       OutputDir="numerov"
+   DefaultOutDir="numerov"
     OutputSuffix="energies.dat"
 
        dimension="2"
@@ -35,7 +35,7 @@ Description:
 
     The default values are:
         Dimensionality    = ${dimension}
-        Output Directory  = $OutputDir
+        Output Directory  = ${DefaultOutDir}/${dimension}D
         Output File Name  = <outputdirectory>/modes_<ModeNo>_<q1>x<q2>x..<qn>_${OutputSuffix}
         Grep String       = $grepstring
         Column Number     = $columnnumber
@@ -44,6 +44,7 @@ EOF
 }
 export -f MAN
 for i in $@; do if [[ $i == '-h' ]]; then MAN; exit 0; fi; done
+if [ $# -eq 0 ]; then MAN; exit 0; fi
 
 
 #--------------------------------------------------------------------------------
@@ -62,26 +63,6 @@ done
 shift $(( OPTIND - 1 ))
 
 InputDirectoryList=${@}
-OutputDir=${PWD}/${OutputDir}
-
-if [ -z ${OutputDir} ]; then
-    printf "Error: No output directory specified\n" >&2
-    MAN
-    exit 1
-fi
-
-if [ -z "$grepstring" ]; then
-    printf "Error: No \"grep string\" specified\n" >&2
-    MAN
-    exit 1
-fi
-
-if [ -z $columnnumber ]; then
-    printf "Error: No \"column number\" specified\n" >&2
-    MAN
-    exit 1
-fi
-
 for i in ${InputDirectoryList}; do
     if [ ! -d $i ]; then
         printf "Error: The provided input directory (\"$i\") is not valid\n" >&2
@@ -89,6 +70,48 @@ for i in ${InputDirectoryList}; do
         exit 1
     fi
 done
+
+# check if dimension is an integer
+if [[ "${dimension}" =~ ^[+-]?[0-9]+$ ]]; then
+# check if the integer is greater than zero
+    if [ 0 -ge "${dimension}" ]; then
+        printf "Error: Dimension (\""${dimension}"\") has to be an integer greater than zero\n" >&2
+        exit 1
+    fi
+else
+    printf "Error: Dimension (\""${dimension}"\") has to be passed as an integer\n" >&2
+    exit 1
+fi
+
+# check if grep string is set
+if [ -z "$grepstring" ]; then
+    printf "Error: No \"grep string\" specified\n" >&2
+    MAN
+    exit 1
+fi
+
+# check if column number is set
+if [ -z $columnnumber ]; then
+    printf "Error: No \"column number\" specified\n" >&2
+    MAN
+    exit 1
+else
+# check if column number is an integer
+    if [[ "${columnnumber}" =~ ^[+-]?[0-9]+$ ]]; then
+    # check if the integer is greater than zero
+        if [ 0 -ge "${columnnumber}" ]; then
+            printf "Error: Column number (\""${columnnumber}"\") has to be an integer greater than zero\n" >&2
+            exit 1
+        fi
+    else
+        printf "Error: Column number (\""${columnnumber}"\") has to be passed as an integer\n" >&2
+        exit 1
+    fi
+fi
+
+# if no output directory is specified use default_dir/<dimension>D
+if [ -z ${OutputDir} ]; then OutputDir="${DefaultOutDir}/${dimension}D"; fi
+OutputDir=${PWD}/${OutputDir}
 
 
 #--------------------------------------------------------------------------------
