@@ -86,7 +86,11 @@ if [ ! -r "$com_body" ]; then printf "Error: File \"$com_body\" could not be rea
 if [ ! -r "$RedMassFile" ]; then printf "Error: File \"$RedMassFile\" could not be read\n"; exit 1; fi
 
 # check if output file is set
-if [ -z $OutputFile ]; then printf "Error: Please specify a suitable output file name prefix\n"; exit 1; fi
+if [ -z $OutputFile ]; then
+    printf "Error: Please specify a suitable output file name prefix\n";
+    printf "    e.g. <dimension>D_scan_<system>_<method>_<solvent>_<mode>\n";
+    exit 1;
+fi
 
 # get dimensionality from the number of mode files provided
 #   and fill the mode file names into mode[] array
