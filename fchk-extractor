@@ -53,10 +53,11 @@ sed '/Vib-AtMass/,/Vib-E2/!d; s/^\s\+//' $inputfile | head -n-1 | tail -n+2 | aw
 sed '/Atomic numbers/,/Nuclear charges/!d' $inputfile | head -n-1 | tail -n+2 | tr -d '\n' | sed "s/\s*\b\([[:digit:]]\+\)\b\s*/\1\n/g" > $outputdir/atommap
 
 # Make atommap useful
-sed -i "s/\b1\b/H/" $outputdir/atommap
-sed -i "s/\b6\b/C/" $outputdir/atommap
-sed -i "s/\b7\b/N/" $outputdir/atommap
-sed -i "s/\b8\b/O/" $outputdir/atommap
+sed -i "s/\b1\b/H/"     $outputdir/atommap
+sed -i "s/\b6\b/C/"     $outputdir/atommap
+sed -i "s/\b7\b/N/"     $outputdir/atommap
+sed -i "s/\b8\b/O/"     $outputdir/atommap
+sed -i "s/\b17\b/Cl/"   $outputdir/atommap
 
 
 #--------------------------------------------------
@@ -74,7 +75,7 @@ fi
 #--------------------------------------------------
 #               Minimum coordinates
 #--------------------------------------------------
-sed '/Current cartesian coordinates/,/Force Field/!d' $inputfile | head -n-1 | tail -n+2 |
+sed '/Current cartesian coordinates/,/Number of symbols/!d' $inputfile | head -n-1 | tail -n+2 |
     awk '{
         for(i = 1; i <= NF; ++i){
             printf "\t% .8le", $i*'$gaussianbohr';
@@ -99,7 +100,9 @@ fi
 #--------------------------------------------------
 #                   Normal modes
 #--------------------------------------------------
-sed '/Vib-Modes/,$ !d' $inputfile | tail -n+2 |
+if [ ! -d ${outputdir}/modes ]; then mkdir -p ${outputdir}/modes; fi
+
+sed '/Vib-Modes/,/ClPar/ !d' $inputfile | head -n-1 | tail -n+2 |
     awk '{
         for(i = 1; i <= NF; ++i){
             printf "\t% .8le", $i
@@ -110,16 +113,16 @@ sed '/Vib-Modes/,$ !d' $inputfile | tail -n+2 |
     }' |
     awk '{
         if(NR % '$n_atoms' == 1){
-            file = "'$outputdir/'mode_" sprintf("%02d", NR/'$n_atoms' + 1)
+            file = "'$outputdir/'modes/mode_" sprintf("%02d", NR/'$n_atoms' + 1)
         }
         print > file
     }'
 
 count=0;
-for i in $outputdir/mode_*; do
+for i in ${outputdir}/modes/mode_*; do
     count=$((count + 1))
-    paste $i $outputdir/masses > tmp
-    mv tmp $i
+    paste $i $outputdir/masses > tmp_${i##*/}
+    mv tmp_${i##*/} $i
 done
 
 #--------------------------------------------------
