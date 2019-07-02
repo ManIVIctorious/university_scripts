@@ -1,7 +1,0 @@
-#!/bin/bash
-
-for i in *.chk; do
-    formchk $i
-    fchk-extractor ${i%.chk}.fchk normal_modes_${i%.chk}
-    getReducedMasses -o normal_modes_${i%.chk}/reduced_masses normal_modes_${i%.chk}/modes/mode_*
-done
